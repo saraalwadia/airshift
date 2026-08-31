@@ -1,0 +1,76 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environment
+
+.venv/
+venv/
+env/
+ENV/
+
+
+# Environment variables & secrets
+
+.env
+.env.*
+!.env.example
+
+# IDE / Editor
+
+.vscode/
+.idea/
+
+# OS files
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data
+
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Keep folder structure
+
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Machine Learning models
+
+models/*
+!models/.gitkeep
+
+# Generated reports and figures
+
+reports/figures/*
+!reports/figures/.gitkeep
+
+# Logs
+
+*.log
+
+# Temporary files
+
+*.tmp
+*.temp
+
+# Python packaging
+
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Coverage
+
+.coverage
+htmlcov/
+.pytest_cache/
+.coverage.*
