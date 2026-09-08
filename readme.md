@@ -99,6 +99,30 @@ The cleaned dataset contains **420,768 observations across 12 monitoring station
 
 ---
 
+### 3. Feature Engineering
+
+The feature engineering stage transforms the cleaned air quality data into meaningful temporal and historical features for the early warning machine learning task.
+
+The feature engineering process included:
+
+* Creating time-based features such as day of the week and weekend indicators
+
+* Creating lag features for pollutant variables using 1-hour, 3-hour, and 6-hour intervals
+
+* Creating rolling mean, maximum, and standard deviation features using previous 3-hour and 6-hour windows
+
+* Creating pollutant change features using 1-hour and 3-hour intervals
+
+* Creating short-term pollutant trend features using previous 3-hour and 6-hour windows
+
+* Ensuring that temporal features use only information available at or before each observation
+
+The feature engineering stage created **80 new features**, resulting in a dataset with **99 columns** and **420,768 observations**.
+
+These features provide information about recent pollution conditions, temporal patterns, changes, and short-term trends that may help identify early warning signals of future air quality deterioration.
+
+---
+
 ## 📊 Dataset
 
 AirShift uses the **Beijing Multi-Site Air Quality Dataset**, containing hourly observations from 12 monitoring stations.
@@ -119,10 +143,10 @@ The dataset includes:
 * [x] Data Profiling & Understanding
 * [x] Data Cleaning
 * [x] Cleaned Dataset Validation
+* [x] Feature Engineering
 
 ### Upcoming
 
-* [ ] Feature Engineering
 * [ ] Deterioration Event Definition
 * [ ] Model Development
 * [ ] Early Warning Prediction
