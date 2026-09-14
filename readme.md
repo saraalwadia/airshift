@@ -165,6 +165,22 @@ Among the valid observations, **47.42%** are classified as deterioration events 
 
 The future-derived variables used only for target construction were removed from the final dataset to prevent accidental data leakage during model development.
 
+### 6. Model Development
+
+The model development stage compares multiple machine learning algorithms for the AirShift early warning task.
+
+Three candidate models were evaluated using a chronological validation strategy:
+
+* Logistic Regression
+* Random Forest
+* XGBoost
+
+The models were evaluated using Accuracy, Precision, Recall, F1-score, ROC-AUC, and PR-AUC.
+
+**XGBoost achieved the strongest overall performance** across most evaluation metrics and was selected for further development and hyperparameter tuning.
+
+Logistic Regression achieved the highest Recall, while XGBoost provided a stronger overall balance between Precision, Recall, F1-score, ROC-AUC, and PR-AUC.
+
 ---
 
 ## 📊 Dataset
