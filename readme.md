@@ -97,7 +97,6 @@ The cleaning process included:
 
 The cleaned dataset contains **420,768 observations across 12 monitoring stations** covering **March 2013 to February 2017**.
 
----
 
 ### 3. Feature Engineering
 
@@ -120,6 +119,51 @@ The feature engineering process included:
 The feature engineering stage created **80 new features**, resulting in a dataset with **99 columns** and **420,768 observations**.
 
 These features provide information about recent pollution conditions, temporal patterns, changes, and short-term trends that may help identify early warning signals of future air quality deterioration.
+
+
+### 4. Deterioration Event Definition
+
+The deterioration event definition stage establishes a clear and measurable definition of future air quality deterioration for the AirShift early warning task.
+
+The analysis focused on:
+
+* Selecting **PM2.5** as the primary pollutant for defining deterioration
+
+* Evaluating different deterioration thresholds to identify a meaningful increase in PM2.5
+
+* Evaluating different future time horizons for short-term early warning
+
+* Selecting a **30% or greater increase in PM2.5 within the following 6 hours** as the initial deterioration-event definition
+
+The selected definition provides a reasonable balance between detecting meaningful short-term increases and maintaining a sufficient number of potential deterioration events.
+
+No target labels are created at this stage. The selected event definition is applied in the following labeling stage.
+
+### 5. Labeling
+
+The labeling stage applies the predefined deterioration-event definition to create the binary target variable required for machine learning.
+
+The labeling process included:
+
+* Calculating the maximum PM2.5 concentration within the following 6 hours for each monitoring station
+
+* Comparing the future maximum PM2.5 value with the current PM2.5 concentration
+
+* Assigning a deterioration label of `1` when PM2.5 increases by **30% or more** within the future 6-hour window
+
+* Assigning a label of `0` when the deterioration threshold is not reached
+
+* Using only observations with a complete 6-hour future PM2.5 window to ensure reliable target labels
+
+* Removing observations for which a reliable deterioration label could not be determined
+
+The final labeled dataset contains **418,381 valid observations across 12 monitoring stations** and **100 columns**.
+
+A total of **2,387 observations (0.57%)** were excluded because sufficient future PM2.5 information was not available to determine the deterioration event reliably.
+
+Among the valid observations, **47.42%** are classified as deterioration events and **52.58%** as non-deterioration events, resulting in a relatively balanced binary target.
+
+The future-derived variables used only for target construction were removed from the final dataset to prevent accidental data leakage during model development.
 
 ---
 
