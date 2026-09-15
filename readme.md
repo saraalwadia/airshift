@@ -181,6 +181,46 @@ The models were evaluated using Accuracy, Precision, Recall, F1-score, ROC-AUC, 
 
 Logistic Regression achieved the highest Recall, while XGBoost provided a stronger overall balance between Precision, Recall, F1-score, ROC-AUC, and PR-AUC.
 
+### 7. XGBoost Optimization
+
+The XGBoost model was further optimized using time-aware hyperparameter tuning.
+
+The tuning process included:
+
+* Using **TimeSeriesSplit** with 3 chronological folds
+
+* Testing 15 XGBoost configurations using `RandomizedSearchCV`
+
+* Optimizing based on **PR-AUC**
+
+* Evaluating `n_estimators`, `learning_rate`, `max_depth`, `min_child_weight`, `subsample`, and `colsample_bytree`
+
+The best configuration achieved a cross-validation **PR-AUC of 0.8324**.
+
+The selected configuration was:
+
+* `n_estimators`: 400
+* `learning_rate`: 0.10
+* `max_depth`: 6
+* `min_child_weight`: 3
+* `subsample`: 0.70
+* `colsample_bytree`: 1.00
+
+On the held-out 2015 validation period, the tuned XGBoost model achieved:
+
+| Metric    |  Score |
+| --------- | -----: |
+| Accuracy  | 0.7279 |
+| Precision | 0.7125 |
+| Recall    | 0.7134 |
+| F1-score  | 0.7129 |
+| ROC-AUC   | 0.8102 |
+| PR-AUC    | 0.8015 |
+
+Compared with the baseline XGBoost model, hyperparameter tuning improved all evaluated metrics, with the largest improvement in **Recall (+0.0075)**.
+
+The selected configuration was retrained using the combined **2013–2015 training and validation data** and saved as the final XGBoost model for evaluation on the unseen 2016–2017 test period.
+
 ---
 
 ## 📊 Dataset
