@@ -1,70 +1,141 @@
+import json
+
 import pandas as pd
 import requests
 
 
-DATA_PATH = "data/processed/airshift_labeled.csv"
+# --------------------------------------------------
+# API configuration
+# --------------------------------------------------
 
-TEST_START = "2016-01-01"
-TEST_END = "2017-02-28 17:00:00"
+API_URL = "http://127.0.0.1:8000/predict"
 
-TARGET = "Deterioration"
+DATA_PATH = "data/processed/airshift_feature_engineered.csv"
 
-EXCLUDE_COLUMNS = [
-    TARGET,
-    "No",
-    "datetime"
+
+# --------------------------------------------------
+# Load dataset
+# --------------------------------------------------
+
+df = pd.read_csv(
+    DATA_PATH,
+    parse_dates=["datetime"],
+)
+
+
+# --------------------------------------------------
+# Select one station and 7 consecutive observations
+# --------------------------------------------------
+
+sample = (
+    df[
+        df["station"] == "Aotizhongxin"
+    ]
+    .sort_values("datetime")
+    .head(7)
+    .copy()
+)
+
+
+# --------------------------------------------------
+# Select only raw input columns
+# --------------------------------------------------
+
+RAW_COLUMNS = [
+    "datetime",
+    "PM2.5",
+    "PM10",
+    "SO2",
+    "NO2",
+    "CO",
+    "O3",
+    "TEMP",
+    "PRES",
+    "DEWP",
+    "RAIN",
+    "wd",
+    "WSPM",
+    "station",
 ]
 
 
-# Load AirShift labeled data
-df = pd.read_csv(
-    DATA_PATH,
-    parse_dates=["datetime"]
+sample = sample[RAW_COLUMNS]
+
+
+# --------------------------------------------------
+# Rename PM2.5 for API schema
+# --------------------------------------------------
+
+sample = sample.rename(
+    columns={
+        "PM2.5": "PM2_5",
+    }
 )
 
 
-# Select the same unseen test period
-test_data = df[
-    (df["datetime"] >= TEST_START) &
-    (df["datetime"] <= TEST_END)
-].copy()
+# --------------------------------------------------
+# Convert datetime to JSON-compatible format
+# --------------------------------------------------
 
-
-# Select one real observation
-# Load the final model to identify a high-probability test observation
-import joblib
-
-model = joblib.load("models/xgboost_final.joblib")
-
-X_test = test_data.drop(
-    columns=EXCLUDE_COLUMNS
+sample["datetime"] = (
+    sample["datetime"]
+    .dt.strftime("%Y-%m-%dT%H:%M:%S")
 )
 
-test_probabilities = model.predict_proba(X_test)[:, 1]
 
-high_probability_index = test_probabilities.argmax()
+# --------------------------------------------------
+# Create request payload
+# --------------------------------------------------
 
-sample = test_data.iloc[high_probability_index]
+payload = {
+    "observations": sample.to_dict(
+        orient="records"
+    )
+}
 
+
+print("Sending prediction request...")
 print(
-    "Selected probability:",
-    test_probabilities[high_probability_index]
+    "Station:",
+    sample["station"].iloc[0],
+)
+print(
+    "Observations:",
+    len(sample),
+)
+print(
+    "Time range:",
+    sample["datetime"].iloc[0],
+    "→",
+    sample["datetime"].iloc[-1],
 )
 
 
-# Build request using the same 97 model features
-features = sample.drop(
-    labels=EXCLUDE_COLUMNS
-).to_dict()
+# --------------------------------------------------
+# Send request
+# --------------------------------------------------
 
-
-# Send request to FastAPI
 response = requests.post(
-    "http://127.0.0.1:8000/predict",
-    json={"features": features}
+    API_URL,
+    json=payload,
+    timeout=30,
 )
 
 
+# --------------------------------------------------
+# Display response
+# --------------------------------------------------
+
+print()
 print("HTTP status:", response.status_code)
-print("API response:")
-print(response.json())
+
+try:
+    print(
+        json.dumps(
+            response.json(),
+            indent=2,
+        )
+    )
+
+except Exception:
+    print(response.text)

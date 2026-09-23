@@ -318,18 +318,3 @@ The dataset includes:
 
 ---
 
-## 🚧 Project Status
-
-### Completed
-
-* [x] Data Profiling & Understanding
-* [x] Data Cleaning
-* [x] Cleaned Dataset Validation
-* [x] Feature Engineering
-
-### Upcoming
-
-* [ ] Deterioration Event Definition
-* [ ] Model Development
-* [ ] Early Warning Prediction
-* [ ] Warning Lead Time Evaluation
