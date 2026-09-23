@@ -221,6 +221,88 @@ Compared with the baseline XGBoost model, hyperparameter tuning improved all eva
 
 The selected configuration was retrained using the combined **2013–2015 training and validation data** and saved as the final XGBoost model for evaluation on the unseen 2016–2017 test period.
 
+### 8. Final Test Evaluation
+
+The final XGBoost model was evaluated on the unseen **2016–2017 test period**.
+
+| Metric    | Test Result |
+| --------- | ----------: |
+| Accuracy  |  **0.7368** |
+| Precision |  **0.7244** |
+| Recall    |  **0.7315** |
+| F1-score  |  **0.7279** |
+| ROC-AUC   |  **0.8215** |
+| PR-AUC    |  **0.8186** |
+
+The model achieved a PR-AUC of **0.8186**, indicating meaningful predictive performance for identifying deterioration events beyond the positive-class prevalence of approximately 48%.
+
+---
+
+### 9. Feature Importance
+
+Feature importance analysis was performed using the trained XGBoost model.
+
+The most important features included:
+
+* `PM2.5_lag_1h`
+* `PM2.5`
+* `PM10_lag_1h`
+* Wind direction categories
+* `RAIN`
+* `hour`
+* `CO_change_1h`
+* `WSPM`
+* `PM10_rolling_mean_3h`
+
+The results show that the model relies strongly on **recent pollution conditions, short-term pollutant dynamics, wind direction, and meteorological variables**.
+
+Feature importance describes how the model uses the features but does not establish causal relationships.
+
+---
+
+### 10. SHAP Interpretation
+
+SHAP analysis was used to examine how individual features contribute to model predictions.
+
+The strongest contributors included:
+
+* `PM2.5`
+* `PM2.5_lag_1h`
+* `hour`
+* `WSPM`
+* `month`
+* `TEMP`
+* `PM2.5_change_1h`
+* `DEWP`
+* `PM2.5_change_3h`
+* `PRES`
+
+The analysis showed that higher current and recent PM2.5 values generally contribute toward higher predicted deterioration probability, while higher wind speed tends to contribute toward lower predicted probability.
+
+SHAP results describe **model behavior and feature contributions**, rather than causal effects.
+
+---
+
+### 11. Early Warning Prediction
+
+The final XGBoost model was converted into an early warning system by applying a probability threshold to its deterioration predictions.
+
+A warning threshold of **0.30** was selected using the 2015 validation period, with emphasis on recall because missed deterioration events are particularly important in an early warning context.
+
+Final performance on the unseen test period:
+
+| Metric            |               Result |
+| ----------------- | -------------------: |
+| Warning threshold |             **0.30** |
+| Precision         |           **0.6252** |
+| Recall            |           **0.8998** |
+| F1-score          |           **0.7378** |
+| True positives    |           **52,795** |
+| False negatives   |            **5,878** |
+| Warning signals   | **84,447 / 121,900** |
+| Lead time range   |        **1–6 hours** |
+|                   |                      |
+
 ---
 
 ## 📊 Dataset
