@@ -1,269 +1,159 @@
 # AirShift — Decisions and Notes
 
-This document records the main methodological, modeling, and engineering decisions made during the development of AirShift.
+This document records the main methodological and engineering decisions made during the development of AirShift, including the reasoning behind them and important project boundaries.
 
-The purpose of this document is to explain **why specific approaches were selected**, rather than repeating the complete implementation described in the project methodology.
-
-The decisions documented here are based on the actual development process, validation results, and final model evaluation.
+It complements the detailed methodology and error log by focusing specifically on **why key decisions were made**.
 
 ---
 
 ## 1. Project Scope
 
-### Decision
+AirShift was designed as an early warning system rather than a conventional pollutant forecasting system.
 
-AirShift was designed as an **early-warning classification system** rather than a conventional pollutant forecasting system.
+The objective is to identify whether current and recent environmental conditions indicate that air quality is likely to deteriorate within the following several hours.
 
-The objective is to estimate whether current and recent environmental conditions indicate that a deterioration event is likely to occur within the following six hours.
+The project focuses on a binary classification problem:
 
-### Rationale
+* `0` — No deterioration event
+* `1` — Deterioration event
 
-The project focuses on the practical question of detecting an upcoming deterioration event rather than predicting the exact future concentration of an individual pollutant.
-
-This led to a binary classification formulation in which each observation is assigned either:
-
-* `0` — no deterioration event
-* `1` — deterioration event
-
-The resulting probability can then be converted into an early-warning decision using a selected threshold.
+The system uses historical air quality and meteorological observations to estimate the probability of a future deterioration event.
 
 ---
 
-# 2. Deterioration Event Definition
+## 2. Automated Raw Data Download
 
-## 2.1 Choice of PM2.5
+A dedicated `scripts/download_data.py` script was added to make raw dataset acquisition reproducible.
 
-### Decision
+The script downloads the original Beijing Multi-Site Air Quality Dataset and extracts the station CSV files into `data/raw/`.
 
-PM2.5 was selected as the primary pollutant for defining the deterioration event.
+The script also checks whether the expected station files already exist and skips the download when the dataset is already available.
 
-### Rationale
+This separates raw data acquisition from the analysis notebooks and allows the project dataset to be obtained consistently without requiring manual download and file placement.
 
-PM2.5 is one of the central air-quality measurements available in the dataset and provides a direct measure around which the project's deterioration definition can be constructed.
-
-The project therefore defines deterioration in terms of a relative increase in PM2.5 rather than attempting to combine multiple pollutants into a single manually defined event score.
+The script only handles raw data acquisition and does not modify processed data, trained models, or analysis outputs.
 
 ---
 
-## 2.2 Relative Increase Threshold
+## 3. Deterioration Event Definition
 
-### Decision
+### 3.1 Why PM2.5?
 
-A deterioration event is defined as a **30% or greater increase in PM2.5** within the following six-hour prediction horizon.
+PM2.5 was selected as the primary pollutant for defining the deterioration event because it is a major air-quality indicator and is consistently available across the monitoring stations.
 
-Formally:
+The project therefore focuses on short-term deterioration in PM2.5 rather than attempting to combine multiple pollutants into a single target.
 
-```text
-Future PM2.5 >= Current PM2.5 × 1.30
-```
+### 3.2 Why a Relative Increase?
 
-### Rationale
+The deterioration event was defined using a relative increase rather than a fixed concentration threshold.
 
-A relative increase was used instead of a fixed concentration threshold so that the event definition represents a substantial change relative to the current pollution level.
+The final definition is:
 
-The 30% threshold is a project-specific operational definition and should not be interpreted as a universal air-quality standard.
+> PM2.5 increases by at least 30% within the following six hours.
 
----
+A relative threshold allows the event definition to represent a meaningful deterioration from the current pollution level rather than applying the same absolute increase to all environmental conditions.
 
-## 2.3 Six-Hour Prediction Horizon
+### 3.3 Why Six Hours?
 
-### Decision
+A six-hour horizon was selected because the project focuses on **short-term early warning** rather than long-term forecasting.
 
-The deterioration event is evaluated over the next **1–6 hours**.
+The horizon is long enough to capture developing deterioration patterns while remaining focused on near-term warning.
 
-### Rationale
+### 3.4 Why the Maximum Future PM2.5?
 
-AirShift is intended to provide an early warning over a short operational horizon.
+The target considers the maximum PM2.5 value observed during the following six hours.
 
-A six-hour horizon provides enough time to investigate whether the current environmental trajectory contains useful warning information while keeping the prediction problem focused on short-term deterioration.
+This allows an event to be detected if the required increase occurs at any point within the defined future window rather than only at exactly six hours later.
 
----
+### 3.5 Clarification of `shift(-6)`
 
-## 2.4 Maximum Future PM2.5
+During development, it was clarified that `shift(-6)` represents the value exactly six hours ahead.
 
-### Decision
+It does not by itself represent an event occurring at any point within the next six hours.
 
-The event label is based on the **maximum PM2.5 value observed during the following 1–6 hours**.
-
-### Rationale
-
-Using the maximum future value allows an observation to be labeled positive if a qualifying deterioration occurs at any point within the defined prediction horizon.
-
-This is different from checking only the PM2.5 value exactly six hours later.
+The final labeling logic therefore evaluates the future six-hour window explicitly.
 
 ---
 
-## 2.5 Clarification of `shift(-6)`
+## 4. Missing Data Decisions
 
-### Note
+### 4.1 Short Numerical Gaps
 
-During development, the interpretation of `shift(-6)` was explicitly corrected.
+Short numerical gaps of up to six hours were interpolated within each monitoring station.
 
-A single:
+The decision was based on the assumption that short gaps can reasonably be estimated from nearby observations while avoiding unnecessary loss of data.
 
-```python
-shift(-6)
-```
-
-represents the value exactly **six hours later**.
-
-It does **not** represent an event occurring at any point within the next six hours.
-
-The final labeling approach therefore considers the complete future 1–6 hour window.
-
----
-
-# 3. Missing Data Decisions
-
-## 3.1 Short Numerical Gaps
-
-### Decision
-
-Short numerical missing-data gaps of up to **6 consecutive hours** were interpolated within each monitoring station.
-
-### Rationale
-
-Short gaps can occur between otherwise available observations in an hourly time series.
-
-Interpolation was limited to short gaps to avoid creating artificial long-term sequences across extended periods of missing data.
-
----
-
-## 3.2 Long Missing Gaps
-
-### Decision
+### 4.2 Long Numerical Gaps
 
 Long pollutant gaps greater than six hours were retained as `NaN`.
 
-### Rationale
+They were not filled artificially because long interpolation periods could create values that are not supported by the observed data.
 
-Long missing periods contain insufficient information to reliably reconstruct the underlying pollutant trajectory.
-
-Filling such gaps would introduce a large amount of artificial information into the time series and could affect subsequent feature engineering and model training.
-
-The cleaned dataset therefore preserves prolonged missingness rather than aggressively imputing it.
-
----
-
-## 3.3 Wind Direction
-
-### Decision
+### 4.3 Wind Direction
 
 Missing wind-direction values were handled using forward filling within each station.
 
-### Rationale
+Wind direction is categorical, so numerical interpolation was not appropriate.
 
-Wind direction is a categorical variable rather than a continuous numerical measurement.
+### 4.4 Extreme Pollution Values
 
-It was therefore handled separately from the numerical pollutant and meteorological variables.
+High pollutant concentrations were not automatically treated as outliers.
 
----
+Extreme pollution episodes are relevant to the project's objective because the system is specifically intended to identify deterioration events.
 
-## 3.4 Extreme Pollution Values
-
-### Decision
-
-High pollutant measurements were not automatically removed as statistical outliers.
-
-### Rationale
-
-AirShift is specifically designed to detect deterioration in air quality.
-
-Consequently, unusually high pollution observations may represent genuine severe pollution conditions rather than measurement errors.
-
-Removing these observations solely because they are statistically extreme could remove important examples of the phenomenon the model is intended to detect.
+Removing extreme observations could therefore remove meaningful examples of the target phenomenon.
 
 ---
 
-# 4. Feature Engineering Decisions
+## 5. Feature Engineering Decisions
 
-## 4.1 Historical Features
+### 5.1 Historical Features
 
-### Decision
+The feature engineering process focuses heavily on recent environmental history.
 
-The model uses historical pollutant information through:
+The final feature set includes:
 
-* 1-hour lags
-* 3-hour lags
-* 6-hour lags
-* 3-hour rolling statistics
-* 6-hour rolling statistics
-* 1-hour changes
-* 3-hour changes
-* 3-hour trends
-* 6-hour trends
+* Pollutant lag features
+* Rolling means
+* Rolling maximums
+* Rolling standard deviations
+* Short-term changes
+* Short-term trend features
+* Temporal features
+* Meteorological variables
+* Station and wind-direction information
 
-### Rationale
+These features were selected to represent both current environmental conditions and recent changes.
 
-The objective of AirShift is not simply to identify the current pollution level.
+### 5.2 Avoiding Future-Data Leakage
 
-The project investigates whether **recent changes and temporal patterns** provide useful information about future deterioration.
+All historical and rolling features were constructed using information available at or before the prediction time.
 
-These features therefore allow the model to represent both current conditions and short-term historical behavior.
+For example, rolling statistics use shifted observations rather than including the current future information.
 
----
-
-## 4.2 Leakage Prevention in Rolling Features
-
-### Decision
-
-Rolling statistics were calculated using previous observations rather than including the current observation.
-
-For example, the implementation uses:
-
-```python
-shift(1).rolling(...)
-```
-
-### Rationale
-
-At prediction time, the model should only use information that would have been available at that prediction moment.
-
-Including future observations would introduce temporal leakage and make model performance unreliable.
+This was necessary because the project is intended to simulate an early-warning setting in which the model cannot access future observations.
 
 ---
 
-## 4.3 Historical Trends
+## 6. Temporal Validation Strategy
 
-### Decision
+A chronological train-validation-test structure was used instead of random splitting.
 
-Trend features were constructed from previous observations.
+The periods were defined as:
 
-The 3-hour trend uses earlier values, while the 6-hour trend is calculated from previous hourly observations.
+| Dataset    | Period    |
+| ---------- | --------- |
+| Training   | 2013–2014 |
+| Validation | 2015      |
+| Final Test | 2016–2017 |
 
-### Rationale
+This decision prevents future observations from being used during model development and provides a more realistic evaluation of performance on later periods.
 
-The trends are intended to represent the recent direction of pollutant movement without using future information.
-
----
-
-# 5. Temporal Validation Strategy
-
-## Decision
-
-The dataset was divided chronologically:
-
-```text
-2013–2014 → Training
-2015      → Validation
-2016–2017 → Final Test
-```
-
-### Rationale
-
-AirShift is a temporal prediction problem.
-
-A random train/test split could place observations from similar time periods on both sides of the split and would not represent the intended forecasting scenario.
-
-The chronological split ensures that the final test period represents a later period than the data used for model development.
+The final test period was kept separate from model selection, hyperparameter tuning, and threshold selection.
 
 ---
 
-# 6. Model Development Decisions
-
-## 6.1 Initial Model Comparison
-
-### Decision
+## 7. Model Development Decisions
 
 Three classification models were evaluated:
 
@@ -271,666 +161,433 @@ Three classification models were evaluated:
 2. Random Forest
 3. XGBoost
 
-### Rationale
+The purpose was to establish multiple model baselines using different modeling approaches.
 
-The project compared models with different characteristics rather than immediately assuming that one algorithm would be appropriate.
+XGBoost was selected for further optimization based on its validation performance.
 
-The comparison provided a baseline for evaluating the suitability of the models for the engineered tabular feature set.
-
----
-
-## 6.2 Selection of XGBoost
-
-### Decision
-
-XGBoost was selected for further optimization and final model development.
-
-### Rationale
-
-During the initial model comparison, XGBoost achieved the following validation results:
-
-| Metric    | XGBoost |
-| --------- | ------: |
-| Accuracy  |  0.7253 |
-| Precision |  0.7118 |
-| Recall    |  0.7059 |
-| F1        |  0.7088 |
-| ROC-AUC   |  0.8074 |
-| PR-AUC    |  0.7982 |
-
-The model was therefore taken forward to the optimization stage.
-
-This selection refers to the project's validation results and does not imply that XGBoost is universally superior to the other algorithms.
+The selection was made using validation results rather than the final test set.
 
 ---
 
-# 7. XGBoost Optimization Decisions
+## 8. XGBoost Optimization Decisions
 
-## 7.1 Time-Series Cross-Validation
+### 8.1 Why XGBoost?
 
-### Decision
+XGBoost was selected for further development because it provided strong validation performance while supporting nonlinear relationships between environmental variables and deterioration events.
 
-`TimeSeriesSplit` with three splits was used during XGBoost hyperparameter optimization.
+### 8.2 TimeSeriesSplit
 
-### Rationale
+`TimeSeriesSplit` with three splits was used during hyperparameter optimization.
 
-Random cross-validation would not preserve temporal ordering.
+This preserved temporal ordering within the cross-validation process.
 
-Time-series cross-validation provides a validation structure that is more consistent with the temporal nature of the problem.
+### 8.3 Optimization Metric
 
----
+`average_precision` was used as the scoring metric during randomized hyperparameter search.
 
-## 7.2 Randomized Search
+This metric was selected because the project is a binary classification problem and the positive deterioration class is the primary class of interest.
 
-### Decision
+### 8.4 Search Strategy
 
-`RandomizedSearchCV` was used to search the XGBoost hyperparameter space.
-
-The search evaluated:
+`RandomizedSearchCV` was used with:
 
 * 15 parameter configurations
-* 3 time-series folds
-* 45 total fits
+* 3 temporal folds
+* 45 total model fits
 
-### Rationale
+The search was performed only on the development data and did not use the final test period.
 
-The search explored multiple combinations of model parameters without exhaustively evaluating every possible combination.
+### 8.5 Final Hyperparameters
 
----
-
-## 7.3 Optimization Metric
-
-### Decision
-
-Average Precision (`average_precision`) was used as the optimization scoring metric.
-
-### Rationale
-
-The project evaluates a binary deterioration event and uses precision-recall analysis as part of model evaluation.
-
-Average Precision was therefore selected as the optimization objective during hyperparameter search.
-
-The best cross-validation PR-AUC was approximately:
+The selected XGBoost configuration was:
 
 ```text
-0.8324
+n_estimators = 400
+learning_rate = 0.1
+max_depth = 6
+min_child_weight = 3
+subsample = 0.7
+colsample_bytree = 1.0
 ```
 
 ---
 
-## 7.4 Final Tuned Hyperparameters
+## 9. Final Model Training Decision
 
-The selected configuration was:
+After model and hyperparameter selection, the final XGBoost model was retrained using the combined training and validation data.
 
-```text
-n_estimators      = 400
-learning_rate     = 0.1
-max_depth         = 6
-min_child_weight  = 3
-subsample         = 0.7
-colsample_bytree  = 1.0
-```
+This included:
 
-These parameters were then used to train the final XGBoost model.
-
----
-
-# 8. Final Model Training Decision
-
-## Decision
-
-After model development and tuning, the final XGBoost model was retrained using the combined **2013–2014 training data and 2015 validation data**.
+* 2013–2014 training data
+* 2015 validation data
 
 The final training dataset contained:
 
 ```text
 296,481 observations
-97 model input features
+97 model features
 ```
 
-The 2016–2017 test period was kept separate.
+The final test period remained completely unseen.
 
-### Rationale
-
-Once model development and hyperparameter selection were completed, the available pre-test data could be combined to train the final model before evaluating it on the untouched test period.
-
-This preserves the role of the final test period as an independent evaluation period.
+This approach allows the final model to use all available development-period information while preserving an independent test set for final evaluation.
 
 ---
 
-# 9. Final Test Evaluation
+## 10. Final Test Evaluation
 
-## Decision
+The final model was evaluated on the 2016–2017 test period.
 
-The final model was evaluated on the chronological test period:
-
-```text
-2016-01-01 → 2017-02-28 17:00
-```
-
-### Rationale
-
-The final test period was not used for:
-
-* model selection
-* hyperparameter tuning
-* final training
-* warning-threshold selection
-
-This provides a cleaner estimate of how the finalized model performs on later observations.
-
----
-
-## Final Test Results
-
-The final XGBoost model achieved:
-
-| Metric    | Final Test |
-| --------- | ---------: |
-| Accuracy  |     0.7368 |
-| Precision |     0.7244 |
-| Recall    |     0.7315 |
-| F1        |     0.7279 |
-| ROC-AUC   |     0.8215 |
-| PR-AUC    |     0.8186 |
-
-The test set contained:
+The final test set contained:
 
 ```text
 121,900 observations
 ```
 
-These results are treated as the final model evaluation rather than as a basis for further tuning.
+The evaluation included:
+
+* Accuracy
+* Precision
+* Recall
+* F1 Score
+* ROC-AUC
+* PR-AUC
+* Confusion matrix
+* ROC curve
+* Precision-recall curve
+
+The final test metrics were:
+
+| Metric    | Result |
+| --------- | -----: |
+| Accuracy  | 0.7368 |
+| Precision | 0.7244 |
+| Recall    | 0.7315 |
+| F1 Score  | 0.7279 |
+| ROC-AUC   | 0.8215 |
+| PR-AUC    | 0.8186 |
+
+The final test set was not used for model selection or tuning.
 
 ---
 
-# 10. Feature Importance Decisions
+## 11. Feature Importance
 
-## Decision
+Built-in XGBoost feature importance was used as an initial model interpretation method.
 
-Built-in XGBoost feature importance was used as an initial model-interpretation method.
+The purpose was to identify which processed features were most frequently relied upon by the learned decision trees.
 
-### Rationale
+The most important features included:
 
-The final XGBoost model provides feature-importance information based on how features are used within its learned decision trees.
+* Recent PM2.5 values
+* Wind-direction categories
+* PM10 historical features
+* Rain
+* Hour
+* Short-term pollutant changes
+* Wind speed
+* Station information
 
-This provides an initial view of which features the model relies on most frequently.
-
-The strongest feature by this measure was:
-
-```text
-PM2.5_lag_1h
-```
-
-with an importance score of approximately:
-
-```text
-0.209936
-```
+Feature importance was treated as an interpretation of model usage rather than evidence of causality.
 
 ---
 
-## Interpretation Note
+## 12. SHAP Analysis
 
-Feature importance was not treated as a causal analysis.
+SHAP was used to provide a more detailed interpretation of the final XGBoost model.
 
-A high importance score indicates that a feature is useful to the trained model, but it does not establish that the feature causes air-quality deterioration.
+The analysis was performed on a sample of 5,000 observations from the final test set.
 
-Correlated features may also distribute predictive information across multiple variables.
+SHAP was selected because it provides information about both:
 
----
+* Global feature importance
+* The direction and magnitude of feature contributions to predictions
 
-# 11. SHAP Interpretation Decision
+The analysis showed strong contributions from:
 
-## Decision
+* Current PM2.5
+* PM2.5 lagged by one hour
+* Hour
+* Wind speed
+* Month
+* Temperature
+* Short-term PM2.5 changes
+* Dew point
+* Pressure
+* Short-term changes in other pollutants
 
-SHAP was added after built-in feature importance to investigate the magnitude and direction of feature contributions.
-
-### Rationale
-
-Built-in feature importance does not directly show whether a feature pushes an individual prediction toward a higher or lower deterioration probability.
-
-SHAP provides additional information about the contribution of feature values to model predictions.
-
----
-
-## SHAP Analysis Configuration
-
-The final model was evaluated using:
-
-```text
-Test observations: 121,900
-SHAP sample: 5,000
-Random seed: 42
-```
-
-The transformed feature space contained:
-
-```text
-123 features
-```
-
-because the categorical variables were one-hot encoded during preprocessing.
+The SHAP results were interpreted as model behavior rather than causal relationships.
 
 ---
 
-## Main SHAP Findings
+## 13. Early-Warning Threshold Decision
 
-The highest global mean absolute SHAP importance included:
+The final model produces a probability of deterioration.
 
-| Feature         | Mean Absolute SHAP |
-| --------------- | -----------------: |
-| PM2.5           |           0.858137 |
-| PM2.5_lag_1h    |           0.391194 |
-| hour            |           0.374115 |
-| WSPM            |           0.263583 |
-| month           |           0.261140 |
-| TEMP            |           0.224092 |
-| PM2.5_change_1h |           0.164035 |
+A probability threshold was therefore required to convert the probability into an early-warning decision.
 
-The analysis indicated that current and recent PM2.5 information had substantial influence on the model predictions.
-
-The SHAP analysis also showed directional patterns for some variables, including higher recent PM2.5 and short-term PM2.5 increases tending to contribute toward higher predicted deterioration probability in the evaluated sample.
-
-These findings describe model behavior and are not causal conclusions.
-
----
-
-# 12. Early-Warning Threshold Decision
-
-## Decision
-
-The final early-warning threshold was set to:
+A threshold of:
 
 ```text
 0.30
 ```
 
-### Rationale
-
-AirShift is intended to function as an early-warning system.
-
-For this purpose, missing a deterioration event is particularly important because a false negative represents an event for which the system did not issue a warning.
-
-The validation results showed the trade-off between precision and recall at different thresholds.
-
-For example:
-
-| Threshold | Precision | Recall |     F1 |
-| --------: | --------: | -----: | -----: |
-|      0.30 |    0.6201 | 0.8813 | 0.7280 |
-|      0.40 |    0.6650 | 0.8046 | 0.7281 |
-|      0.50 |    0.7112 | 0.7106 | 0.7109 |
-|      0.60 |    0.7617 | 0.6041 | 0.6738 |
-|      0.70 |    0.8169 | 0.4881 | 0.6111 |
-
-The threshold of 0.30 was selected because the early-warning objective places greater emphasis on maintaining high recall and reducing missed deterioration events.
+was selected.
 
 The threshold was selected using the validation period rather than the final test set.
 
+The main consideration was the early-warning objective, where missing a deterioration event is particularly important.
+
+Therefore, the threshold was intentionally selected to provide higher recall rather than simply maximizing accuracy.
+
+This is a project design decision rather than a test-set optimization result.
+
 ---
 
-# 13. Early-Warning Test Results
+## 14. Early-Warning Test Results
 
-Using the 0.30 threshold on the final test period produced:
+Using the 0.30 threshold on the final test set produced:
 
-| Metric    | Warning Mode |
-| --------- | -----------: |
-| Precision |       0.6252 |
-| Recall    |       0.8998 |
-| F1        |       0.7378 |
+| Metric    | Result |
+| --------- | -----: |
+| Precision | 0.6252 |
+| Recall    | 0.8998 |
+| F1 Score  | 0.7378 |
 
 The resulting confusion matrix was:
 
-|                    | Actual Negative | Actual Positive |
-| ------------------ | --------------: | --------------: |
-| Predicted Negative |          31,575 |           5,878 |
-| Predicted Positive |          31,652 |          52,795 |
+|                 | Predicted Negative | Predicted Positive |
+| --------------- | -----------------: | -----------------: |
+| Actual Negative |             31,575 |             31,652 |
+| Actual Positive |              5,878 |             52,795 |
 
-This threshold therefore increased recall substantially compared with the default 0.50 classification threshold, while also producing more false-positive warnings.
-
-This trade-off is a consequence of the selected warning threshold.
-
----
-
-# 14. Lead-Time Definition
-
-## Decision
-
-For lead-time analysis, the estimated deterioration occurrence time was defined as the **earliest future hour between 1 and 6 hours** at which PM2.5 reached the deterioration threshold.
-
-### Rationale
-
-The project needs a consistent definition of when a deterioration event is considered to occur in order to estimate the time between a warning and the event.
-
-The earliest qualifying future hour provides a concrete reference point within the six-hour event horizon.
-
----
-
-# 15. Lead-Time Results
-
-For the final test period:
+The model generated:
 
 ```text
-Positive labels: 58,673
-Positive labels with occurrence time: 58,650
-Successful warnings: 52,786
+84,447 warnings
 ```
 
-The successful-warning lead times were:
+out of 121,900 test observations.
 
-| Lead Time |  Count | Percentage |
-| --------: | -----: | ---------: |
-|    1 hour | 15,677 |     29.70% |
-|   2 hours | 12,072 |     22.87% |
-|   3 hours |  8,937 |     16.93% |
-|   4 hours |  6,770 |     12.83% |
-|   5 hours |  5,247 |      9.94% |
-|   6 hours |  4,083 |      7.74% |
-
-Summary:
-
-* Mean lead time: **2.7364 hours**
-* Median lead time: **2 hours**
-* Range: **1–6 hours**
-* 52.57% of successful warnings occurred at least 2 hours before the estimated deterioration occurrence.
-
-### Interpretation Note
-
-The mean lead time of approximately 2.74 hours should **not** be presented as a guaranteed operational warning duration.
-
-It describes the observed timing of successful warnings relative to the project's six-hour deterioration definition.
+The high recall reflects the project's emphasis on identifying deterioration events rather than minimizing the total number of warnings.
 
 ---
 
-# 16. API Design Decisions
+## 15. Lead-Time Definition
 
-## 16.1 Minimum Seven Observations
+Lead time was estimated using the first future hour, from one to six hours ahead, at which PM2.5 reached at least 130% of its current value.
 
-### Decision
+The lead time therefore represents the difference between:
 
-The `/predict` endpoint requires at least seven hourly observations.
+* The time at which the model generates an early warning
+* The estimated first occurrence of the defined deterioration event
 
-### Rationale
-
-The feature-engineering pipeline requires historical information up to six hours before the prediction point.
-
-Seven observations provide the current observation plus the preceding six hourly observations needed for the maximum lag requirement.
+The lead-time analysis was performed only for test observations associated with valid deterioration events.
 
 ---
 
-## 16.2 Consecutive Hourly Observations
+## 16. Lead-Time Results
 
-### Decision
+Among successful warnings:
 
-The API rejects observations that are not consecutive hourly measurements.
+* Lead time ranged from 1 to 6 hours
+* Mean lead time: 2.74 hours
+* Median lead time: 2 hours
+* 52.57% of successful warnings occurred at least 2 hours before the estimated deterioration occurrence
 
-### Rationale
+These results describe the timing of warnings within the project's six-hour target definition.
 
-The lag and rolling features assume that adjacent rows represent adjacent hours.
-
-If an hour is missing, a row-based six-step lag would no longer represent a six-hour temporal interval.
-
-The API therefore checks timestamp continuity before feature generation.
-
----
-
-## 16.3 Single Station per Request
-
-### Decision
-
-All observations in one `/predict` request must belong to the same monitoring station.
-
-### Rationale
-
-The feature-engineering process groups historical calculations by station.
-
-Mixing observations from different stations within a single request could produce invalid temporal features.
-
-The API therefore validates station consistency before generating features.
+They should not be interpreted as a guaranteed operational warning time under real-world deployment conditions.
 
 ---
 
-## 16.4 Duplicate Timestamp Validation
+## 17. API Design Decisions
 
-### Decision
+A FastAPI service was added to expose the trained model through a simple prediction endpoint.
 
-Duplicate timestamps are rejected.
-
-### Rationale
-
-Duplicate timestamps would violate the expected hourly time-series structure and could produce ambiguous historical features.
-
----
-
-## 16.5 Reusing Feature Engineering
-
-### Decision
-
-The API uses the same feature-engineering logic developed for the modeling pipeline.
-
-### Rationale
-
-The model was trained using a specific set of engineered features.
-
-Reimplementing the feature logic differently inside the API could cause a mismatch between training-time and inference-time features.
-
-The API therefore reuses the project feature-engineering implementation.
-
----
-
-# 17. API Feature-Schema Validation
-
-## Decision
-
-The API explicitly checks that the generated feature columns match the features expected by the saved final model.
-
-### Rationale
-
-The final model expects:
+The API provides:
 
 ```text
+GET  /
+GET  /health
+POST /predict
+```
+
+The `/predict` endpoint accepts recent hourly observations and returns:
+
+* Prediction timestamp
+* Station
+* Deterioration probability
+* Warning threshold
+* Early-warning decision
+
+The API uses the saved final XGBoost model rather than retraining the model at request time.
+
+---
+
+## 18. API Feature Schema Validation
+
+The API was designed to reproduce the same feature structure expected by the trained model.
+
+The incoming request provides the raw observation variables, while calendar features such as:
+
+* `year`
+* `month`
+* `day`
+* `hour`
+
+are derived from the supplied datetime.
+
+This was necessary because these variables were part of the original model feature schema.
+
+The API feature-engineering implementation was tested against the feature-engineering logic used during model development.
+
+The resulting engineered dataset matched the expected:
+
+```text
+99 engineered columns
 97 model input features
 ```
 
-The API verifies that these features are available before prediction.
+---
 
-This check was especially important during development because the API initially failed to generate the original `year` and `day` model features from the supplied `datetime`.
+## 19. API Validation Decisions
 
-The API was subsequently updated to derive:
+The API validates several conditions before attempting prediction.
 
-```text
-year
-month
-day
-hour
-```
+### Minimum History
 
-from the request's `datetime` values before feature engineering.
+At least seven hourly observations are required.
+
+This is necessary because the feature engineering process requires historical observations for lag and rolling features.
+
+### Consecutive Timestamps
+
+Observations must represent consecutive hourly measurements.
+
+This prevents invalid lag and rolling calculations caused by missing time intervals.
+
+### Duplicate Timestamps
+
+Duplicate timestamps are rejected to ensure that each hourly observation represents a unique point in time.
+
+### Single Station
+
+All observations in a prediction request must belong to the same monitoring station.
+
+This is required because the feature engineering process is station-specific.
+
+### Feature Compatibility
+
+The API checks that the generated features contain the feature names expected by the final model.
+
+This provides an additional safeguard against training-serving feature mismatches.
 
 ---
 
-# 18. API Validation Decisions
+## 20. Model Persistence
 
-A dedicated API test script was created to validate both successful prediction and input errors.
-
-The implemented validation tests cover:
-
-1. Valid prediction
-2. Fewer than seven observations
-3. Non-consecutive timestamps
-4. Duplicate timestamps
-5. Multiple stations
-
-All five validation scenarios produced the expected results.
-
-The valid prediction test returned:
-
-```text
-HTTP 200
-```
-
-while the invalid-input tests returned:
-
-```text
-HTTP 400
-```
-
-for the corresponding validation errors.
-
----
-
-# 19. Model Persistence Decision
-
-## Decision
-
-The final fitted XGBoost pipeline is saved as:
+The final trained model is stored as:
 
 ```text
 models/xgboost_final.joblib
 ```
 
-### Rationale
+The API loads this saved model when the application starts.
 
-Saving the fitted pipeline allows the API to load the trained model directly without repeating model training or preprocessing fitting.
-
-The saved model includes the fitted preprocessing stage and trained XGBoost estimator.
-
-This makes the model available for inference through the FastAPI service.
+This separates model training from inference and avoids retraining the model every time a prediction is requested.
 
 ---
 
-# 20. Important Development Correction: Final Model Fitting
+## 21. Final Model Fitting Correction
 
-## Issue
+During API and final evaluation development, an issue was identified in which the saved final XGBoost pipeline contained a fitted preprocessing component but an unfitted XGBoost estimator.
 
-During development of the final evaluation and interpretation notebooks, the saved `xgboost_final.joblib` file initially contained a fitted preprocessing component but an unfitted XGBoost estimator.
+This resulted in a `NotFittedError` when the model was loaded for downstream use.
 
-This caused a `NotFittedError` when the model was loaded for later analysis.
+The issue was resolved by explicitly fitting the complete final pipeline on the combined 2013–2015 development data before saving it.
 
-## Decision
+The corrected model was then verified to ensure that:
 
-The final model was retrained using the already selected XGBoost hyperparameters and the combined training and validation data.
+* The XGBoost estimator was fitted
+* The saved model file existed
+* The API could load the model
+* Predictions could be generated successfully
 
-No additional hyperparameter search was performed.
-
-## Result
-
-The corrected final model was successfully verified as fitted and saved again.
-
-The resulting model file was approximately:
-
-```text
-1.74 MB
-```
-
-This correction ensured that the final evaluation, feature-importance analysis, SHAP analysis, and API all use a properly fitted model.
+No additional hyperparameter tuning was performed as part of this correction.
 
 ---
 
-# 21. Interpretation Boundaries
+## 22. Interpretation Boundaries
 
-Several results in AirShift are deliberately treated as model interpretation rather than causal conclusions.
+The project distinguishes between **prediction** and **causal explanation**.
 
-### Feature importance
+Feature importance and SHAP identify patterns used by the trained model, but they do not establish that a feature causes air quality deterioration.
 
-A feature's importance indicates its usefulness to the trained model.
+Correlated variables may also distribute predictive information across multiple features.
 
-It does not prove that the feature causes deterioration.
+Similarly, high predictive probability does not guarantee that a deterioration event will occur.
 
-### SHAP
-
-SHAP explains how feature values contribute to model predictions.
-
-It does not establish causal relationships.
-
-### Lead time
-
-Lead time describes the timing of successful predictions relative to the project's event definition.
-
-It does not guarantee that the system would provide the same warning duration in a real-world deployment.
-
-### Test performance
-
-The final test metrics describe performance on the selected Beijing dataset and test period.
-
-They should not automatically be interpreted as expected performance on another city, sensor network, or environmental setting.
+The model should therefore be interpreted as a statistical early-warning system rather than a causal environmental model.
 
 ---
 
-# 22. Current Project Boundaries
+## 23. Current Project Boundaries
 
-AirShift currently represents a research and portfolio implementation rather than a production air-quality warning service.
+AirShift is currently an end-to-end machine learning prototype.
 
-The current implementation does not include:
+The project includes:
 
-* Real-time external sensor integration
-* Production deployment infrastructure
-* Authentication
-* Rate limiting
-* Production monitoring
-* Automated model retraining
+* Data acquisition
+* Data cleaning
+* Feature engineering
+* Event definition
+* Labeling
+* Model development
+* Hyperparameter optimization
+* Final evaluation
+* Model interpretation
+* Early-warning prediction
+* Lead-time analysis
+* FastAPI inference
 
-These are future engineering possibilities rather than completed project components.
-
----
-
-# 23. Key Methodological Principles
-
-The following principles guided the development of AirShift:
-
-### 1. Preserve temporal structure
-
-Future observations should not influence model development or feature generation.
-
-### 2. Avoid unnecessary imputation
-
-Short gaps can be interpolated, while prolonged gaps are preserved as missing.
-
-### 3. Treat severe pollution as meaningful
-
-Extreme pollution values are potentially important deterioration observations rather than automatic outliers.
-
-### 4. Separate development from final testing
-
-The final test period remains separate from model selection, hyperparameter tuning, final training, and threshold selection.
-
-### 5. Distinguish prediction from causality
-
-Model importance and SHAP results describe learned predictive relationships rather than causal effects.
-
-### 6. Keep inference consistent with training
-
-The API reuses the same feature-engineering logic and saved preprocessing/model pipeline.
+The current API is intended for local inference and has not been developed as a production service with authentication, rate limiting, monitoring, or cloud deployment.
 
 ---
 
-# 24. Final Notes
+## 24. Key Methodological Principles
 
-AirShift evolved from a conventional air-quality prediction idea into a more specific early-warning classification problem.
+Several principles guided the project throughout development:
 
-The final system combines:
+1. **Preserve temporal ordering**
+   Future observations should not influence model development or prediction features.
 
-```text
-Historical Environmental Data
-          ↓
-Temporal Feature Engineering
-          ↓
-Deterioration Event Definition
-          ↓
-Chronological Model Development
-          ↓
-XGBoost Optimization
-          ↓
-Independent Test Evaluation
-          ↓
-Model Interpretation
-          ↓
-Early-Warning Threshold
-          ↓
-Lead-Time Evaluation
-          ↓
-FastAPI Inference
-```
+2. **Avoid artificial data creation**
+   Long missing-data gaps are retained rather than aggressively interpolated.
 
-The main methodological decisions documented here were made to preserve the temporal nature of the problem, reduce leakage risk, maintain consistency between training and inference, and align the final prediction system with the project's early-warning objective.
+3. **Keep the test period independent**
+   The final test period is reserved for final evaluation.
+
+4. **Prioritize the project's actual objective**
+   The system is evaluated as an early-warning classifier rather than only as a general-purpose classifier.
+
+5. **Separate prediction from interpretation**
+   Model explanations are not treated as causal conclusions.
+
+6. **Keep training and inference consistent**
+   The API reproduces the feature structure expected by the trained model.
+
+7. **Make data acquisition reproducible**
+   The raw dataset can be obtained through a dedicated download script rather than relying entirely on manual file placement.
+
+---
+
+## 25. Final Notes
+
+AirShift evolved from a data exploration project into a complete machine learning workflow covering data acquisition, preprocessing, feature engineering, temporal modeling, model interpretation, early-warning prediction, and API deployment.
+
+The final system provides a reproducible research and portfolio prototype for investigating short-term air quality deterioration and the potential use of machine learning for early warning.
+
+The project remains bounded by its target definition, historical dataset, six-hour prediction horizon, and local inference setup.
+
+Future extensions can build on this foundation without changing the core experimental results documented in the current project.
