@@ -42,11 +42,6 @@ data/processed/*
 !data/interim/.gitkeep
 !data/processed/.gitkeep
 
-# Machine Learning models
-
-models/*
-!models/.gitkeep
-
 # Generated reports and figures
 
 reports/figures/*
