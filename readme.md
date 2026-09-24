@@ -36,6 +36,20 @@ The final labeled dataset contains **418,381 valid observations**.
 
 ---
 
+## 📥 Data Setup
+
+The original dataset can be downloaded and prepared automatically using:
+
+```bash
+python scripts/download_data.py
+```
+
+The script downloads the dataset and extracts the 12 station files into `data/raw/`.
+
+If the dataset is already present, the script skips the download.
+
+---
+
 ## 🔄 Machine Learning Pipeline
 
 ```text
@@ -92,8 +106,6 @@ XGBoost was selected for further optimization based on its validation performanc
 
 ### Final XGBoost
 
-The optimized model uses:
-
 ```text
 n_estimators = 400
 learning_rate = 0.1
@@ -141,7 +153,7 @@ SHAP was used to examine both global feature importance and the direction of fea
 
 ## 🚨 Early Warning System
 
-For the operational warning experiment, a probability threshold of **0.30** was selected to emphasize sensitivity to deterioration events.
+For the early-warning experiment, a probability threshold of **0.30** was selected using the validation period to emphasize sensitivity to deterioration events.
 
 ### Test Results
 
@@ -153,8 +165,6 @@ For the operational warning experiment, a probability threshold of **0.30** was 
 
 The system generated **84,447 warnings out of 121,900 test observations**.
 
-The threshold was selected using the validation period and was not optimized using the final test set.
-
 ---
 
 ## ⏱️ Warning Lead Time
@@ -163,7 +173,7 @@ For detected deterioration events, the estimated lead time ranged from **1 to 6 
 
 * Mean: **2.74 hours**
 * Median: **2 hours**
-* 52.57% of successful warnings occurred at least **2 hours before** the estimated deterioration occurrence.
+* **52.57%** of successful warnings occurred at least **2 hours before** the estimated deterioration occurrence.
 
 Lead time represents the timing of warnings relative to the defined six-hour deterioration target; it should not be interpreted as a guaranteed operational warning time.
 
@@ -189,7 +199,7 @@ The `/predict` endpoint accepts recent hourly observations and returns:
 * Prediction timestamp
 * Monitoring station
 
-The API includes validation for:
+The API validates:
 
 * Minimum historical observations
 * Consecutive hourly timestamps
@@ -226,6 +236,8 @@ airshift/
 ├── notebooks/
 ├── reports/
 │   └── figures/
+├── scripts/
+│   └── download_data.py
 ├── requirements.txt
 ├── README.md
 └── .gitignore
@@ -247,18 +259,19 @@ airshift/
 
 **Completed**
 
-* Data profiling and cleaning
-* Feature engineering
-* Event definition and labeling
-* Model development and XGBoost optimization
-* Final test evaluation
-* Feature importance analysis
-* SHAP interpretation
-* Early warning evaluation
-* Lead-time analysis
-* FastAPI deployment and validation
+* [x] Data profiling and cleaning
+* [x] Automated dataset download
+* [x] Feature engineering
+* [x] Event definition and labeling
+* [x] Model development and XGBoost optimization
+* [x] Final test evaluation
+* [x] Feature importance analysis
+* [x] SHAP interpretation
+* [x] Early warning evaluation
+* [x] Lead-time analysis
+* [x] FastAPI deployment and validation
 
-**AirShift is currently a completed end-to-end machine learning prototype for research and portfolio purposes.**
+**AirShift is a completed end-to-end machine learning prototype for research and portfolio purposes.**
 
 ---
 
