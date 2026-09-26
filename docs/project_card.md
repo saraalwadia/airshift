@@ -366,6 +366,8 @@ The API validation suite successfully tested:
 
 **API:** FastAPI, Uvicorn, Pydantic
 
+**User Interface:** Streamlit, Plotly
+
 **Development:** Jupyter Notebook, VS Code
 
 **Version Control:** Git, GitHub
@@ -399,7 +401,9 @@ Early Warning Prediction
     ↓
 Lead-Time Evaluation
     ↓
-FastAPI
+FastAPI Prediction API
+    ↓
+Streamlit User Interface
 ```
 
 ---
@@ -438,6 +442,7 @@ Key limitations include:
 * [x] Warning Lead-Time Evaluation
 * [x] FastAPI Prediction API
 * [x] API Validation
+* [x] Streamlit User Interface
 
 ### Final Documentation
 

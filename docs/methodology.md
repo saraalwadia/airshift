@@ -877,4 +877,158 @@ models/xgboost_final.joblib
 
 model at application startup.
 
-## 15.1 Prediction Workflo
+---
+
+## 15.1 Prediction Workflow
+
+The AirShift API provides an inference endpoint that accepts recent hourly air quality observations and returns an early-warning prediction.
+
+The prediction workflow is:
+
+```text
+Input Observations
+        ↓
+Request Validation
+        ↓
+Temporal Validation
+        ↓
+Feature Engineering
+        ↓
+Final XGBoost Model
+        ↓
+Deterioration Probability
+        ↓
+Early-Warning Threshold
+        ↓
+Prediction Response
+```
+
+The API requires at least seven consecutive hourly observations from the same monitoring station. The observations are sorted by datetime and validated to ensure that timestamps are unique and separated by exactly one hour.
+
+The API then applies the same feature-engineering logic used during model development, including lag features, rolling statistics, short-term changes, and trend features.
+
+The final engineered observation is passed to the saved XGBoost model, which returns the predicted probability of future deterioration.
+
+The prediction uses the configured early-warning threshold of **0.30**. If the predicted probability is greater than or equal to this threshold, the API returns an early-warning signal.
+
+---
+
+## 15.2 Input Validation
+
+The API performs several validation checks before generating a prediction.
+
+These checks include:
+
+* At least seven hourly observations are provided
+* All observations belong to the same monitoring station
+* Datetime values are unique
+* Observations are consecutive hourly measurements
+* Required features are available after feature engineering
+* No missing values remain in the final model input
+* The generated feature schema matches the features expected by the trained model
+
+Invalid requests are rejected with an appropriate HTTP error response rather than being passed to the model.
+
+---
+
+## 15.3 Early-Warning Response
+
+The API returns the following information:
+
+* Prediction timestamp
+* Monitoring station
+* Predicted deterioration probability
+* Configured warning threshold
+* Early-warning decision
+
+The response allows client applications to display both the model probability and the resulting warning status.
+
+---
+
+## 15.4 API Validation and Testing
+
+The API was tested using a dedicated validation script covering both valid and invalid requests.
+
+The validation tests included:
+
+1. A valid seven-hour observation sequence
+2. Fewer than seven observations
+3. Non-consecutive timestamps
+4. Duplicate timestamps
+5. Observations from multiple monitoring stations
+
+The valid request successfully returned a deterioration probability and early-warning decision, while invalid requests were rejected with the expected HTTP 400 responses.
+
+The API feature-engineering pipeline was also tested independently to confirm that the generated features match the feature schema expected by the final XGBoost model.
+
+---
+
+## 15.5 Model Integration
+
+The FastAPI application loads the final trained XGBoost model from:
+
+```text
+models/xgboost_final.joblib
+```
+
+The model is loaded when the application starts and is reused for prediction requests.
+
+The API does not retrain the model during prediction. Feature engineering and inference are performed using the saved model and the same feature structure established during model development.
+
+This ensures that the deployed inference process remains consistent with the final trained model.
+
+---
+
+## 16. Streamlit User Interface
+
+A Streamlit-based user interface was added as the user-facing layer of the AirShift inference system.
+
+The interface communicates with the FastAPI prediction service rather than loading the XGBoost model directly.
+
+The complete inference architecture is:
+
+```text
+User
+  ↓
+Streamlit Interface
+  ↓
+FastAPI /predict
+  ↓
+Request Validation
+  ↓
+Feature Engineering
+  ↓
+Final XGBoost Model
+  ↓
+Prediction Response
+  ↓
+Streamlit Results
+```
+
+The Streamlit application is implemented in:
+
+```text
+app/streamlit_app.py
+```
+
+The interface provides:
+
+* Monitoring station selection
+* Demo observation data
+* CSV observation upload
+* Input validation
+* Recent observation display
+* Current air quality conditions
+* PM2.5 trend visualization
+* Deterioration probability display
+* Warning threshold display
+* Early-warning decision
+* Basic model information
+
+The Streamlit interface performs client-side validation before sending observations to the API. The FastAPI service performs the validation again before generating the prediction.
+
+The Streamlit application does not implement a separate machine learning or feature-engineering pipeline. Instead, it sends observations to the existing FastAPI `/predict` endpoint, which performs validation, feature engineering, and model inference.
+
+This separation ensures that the same trained model and inference logic are used regardless of whether predictions are requested through the Streamlit interface or another API client.
+
+The current Streamlit application is intended as a local project interface and is not presented as a production real-time monitoring system.

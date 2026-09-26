@@ -533,7 +533,109 @@ This separates model development from model inference and provides a reusable in
 
 ---
 
-## 19. Future Extensions
+## 19. Streamlit User Interface
+
+AirShift includes a Streamlit-based user interface that provides a simple way to interact with the prediction API.
+
+The Streamlit application does not load or modify the XGBoost model directly. Instead, it communicates with the FastAPI service through the `/predict` endpoint.
+
+### Application Architecture
+
+The complete inference workflow is:
+
+```text
+User
+  ↓
+Streamlit Interface
+  ↓
+FastAPI /predict
+  ↓
+Request Validation
+  ↓
+Feature Engineering
+  ↓
+XGBoost Model
+  ↓
+Prediction Response
+  ↓
+Streamlit Results
+```
+
+### Streamlit Application
+
+The interface is implemented in:
+
+```text
+app/streamlit_app.py
+```
+
+The application allows users to:
+
+* Select a monitoring station
+* Load demo observations
+* Upload recent air quality observations through CSV
+* Review recent observations
+* View current PM2.5, PM10, temperature, and wind speed
+* Visualize the recent PM2.5 trend
+* Request an early-warning prediction
+* View the predicted deterioration probability
+* View the configured warning threshold
+* View the early-warning decision
+* View basic model information
+
+### Running the Interface
+
+The FastAPI service must be running first:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Then, in a separate terminal, start the Streamlit application:
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+The Streamlit application communicates with the local API at:
+
+```text
+http://127.0.0.1:8000
+```
+
+### Input Validation
+
+The Streamlit interface performs client-side validation before sending uploaded observations to the API.
+
+The interface checks:
+
+* Required columns
+* Valid datetime values
+* Duplicate timestamps
+* Minimum of seven observations
+* Single monitoring station
+* Consecutive hourly timestamps
+* Valid monitoring station names
+
+The FastAPI service performs its own validation again before generating the prediction.
+
+### Prediction Flow
+
+When the user selects **Analyze Air Quality**, the Streamlit application:
+
+1. Prepares the observation data.
+2. Converts timestamps into the API-compatible format.
+3. Sends the observations to `/predict`.
+4. Receives the prediction response.
+5. Displays the deterioration probability.
+6. Displays the configured warning threshold.
+7. Displays the early-warning decision.
+
+This design keeps the user interface separate from the machine learning model and allows the same FastAPI inference service to be reused by other clients in the future.
+
+---
+
+## 20. Future Extensions
 
 Potential future extensions include:
 

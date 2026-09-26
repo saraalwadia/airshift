@@ -488,7 +488,114 @@ The valid test request returned:
 
 ---
 
-# 15. Development Lessons
+# 15. Streamlit Interface Development Issues
+
+Several technical issues were encountered while integrating the Streamlit user interface with the AirShift FastAPI service.
+
+### Timestamp Serialization
+
+#### Problem
+
+After adding the PM2.5 visualization, the Streamlit application converted the `datetime` column into pandas datetime values for charting.
+
+When the resulting dataframe was sent directly to the FastAPI endpoint, the request failed because pandas `Timestamp` objects are not directly JSON serializable.
+
+#### Resolution
+
+A separate copy of the prediction data was created before sending the request to the API.
+
+The datetime values were converted to ISO-compatible strings:
+
+```python
+payload_data["datetime"] = (
+    payload_data["datetime"]
+    .dt.strftime("%Y-%m-%dT%H:%M:%S")
+)
+```
+
+The serialized dataframe was then converted into the API request structure.
+
+#### Verification
+
+After the correction, the Streamlit application successfully sent observations to `/predict` and received a valid prediction response.
+
+---
+
+### PM2.5 Column Naming
+
+#### Problem
+
+The API schema uses `PM2_5` because the original `PM2.5` column name contains a period.
+
+The Streamlit application initially attempted to create the Plotly chart using the API field name and the original dataset field name interchangeably, which caused a column lookup error.
+
+#### Resolution
+
+The Streamlit application uses `PM2_5` for API requests and renames the column to `PM2.5` only for chart presentation.
+
+This keeps the API schema compatible with Pydantic while preserving the original pollutant name in the user interface.
+
+#### Verification
+
+The PM2.5 Plotly visualization was successfully rendered and the prediction request continued to work correctly.
+
+---
+
+### Streamlit–FastAPI Integration
+
+#### Problem
+
+The user interface needed to communicate with the existing FastAPI prediction service without duplicating model-loading and feature-engineering logic.
+
+#### Resolution
+
+Streamlit was implemented as a client of the FastAPI `/predict` endpoint.
+
+The Streamlit application does not load the XGBoost model directly. Instead, it sends validated observations to FastAPI and displays the returned prediction.
+
+#### Verification
+
+The complete workflow was successfully tested:
+
+```text
+Streamlit
+    ↓
+FastAPI /predict
+    ↓
+Feature Engineering
+    ↓
+XGBoost
+    ↓
+Prediction Response
+    ↓
+Streamlit
+```
+
+A valid test returned a deterioration probability and early-warning decision successfully.
+
+---
+
+### API Availability Handling
+
+#### Problem
+
+The Streamlit application depends on the local FastAPI service being available.
+
+If the API is not running, prediction requests cannot be completed.
+
+#### Resolution
+
+The interface checks the API health endpoint and displays the local API status.
+
+Prediction requests also handle connection and request errors so that API failures are presented to the user instead of causing an unhandled application error.
+
+#### Verification
+
+The interface successfully displayed the local API as online when the FastAPI service was running and handled unavailable-API conditions during development.
+
+---
+
+# 16. Development Lessons
 
 The development process highlighted several important engineering considerations for AirShift.
 
@@ -518,7 +625,7 @@ A model file existing on disk does not guarantee that every component of the sav
 
 ---
 
-# 16. Current Status
+# 17. Current Status
 
 All documented issues in this log were resolved and verified during development.
 

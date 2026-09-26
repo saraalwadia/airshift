@@ -555,7 +555,60 @@ The current API is intended for local inference and has not been developed as a 
 
 ---
 
-## 24. Key Methodological Principles
+## 24. Streamlit User Interface
+
+A Streamlit-based user interface was added as the user-facing layer of the AirShift inference system.
+
+The interface communicates with the FastAPI service rather than loading or modifying the XGBoost model directly.
+
+The resulting architecture is:
+
+```text
+User
+  ↓
+Streamlit Interface
+  ↓
+FastAPI /predict
+  ↓
+Request Validation
+  ↓
+Feature Engineering
+  ↓
+Final XGBoost Model
+  ↓
+Prediction Response
+  ↓
+Streamlit Results
+```
+
+The Streamlit application is implemented in:
+
+```text
+app/streamlit_app.py
+```
+
+The interface provides:
+
+* Monitoring station selection
+* Demo observation data
+* CSV observation upload
+* Input validation
+* Recent observation display
+* PM2.5 trend visualization
+* Deterioration probability display
+* Warning threshold display
+* Early-warning decision
+* Basic model information
+
+The Streamlit application does not implement a separate prediction or feature-engineering process. It sends the observations to the existing FastAPI `/predict` endpoint, which performs validation, feature engineering, and model inference.
+
+This separation keeps the user interface independent from the machine learning model and allows the FastAPI inference service to remain reusable for other clients.
+
+The current Streamlit interface is intended as a local project interface and does not represent a production monitoring dashboard or real-time sensor deployment.
+
+---
+
+## 25. Key Methodological Principles
 
 Several principles guided the project throughout development:
 
@@ -582,7 +635,7 @@ Several principles guided the project throughout development:
 
 ---
 
-## 25. Final Notes
+## 26. Final Notes
 
 AirShift evolved from a data exploration project into a complete machine learning workflow covering data acquisition, preprocessing, feature engineering, temporal modeling, model interpretation, early-warning prediction, and API deployment.
 

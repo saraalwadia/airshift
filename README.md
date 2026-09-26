@@ -211,6 +211,61 @@ See the [API documentation](docs/api_documentation.md) for usage details.
 
 ---
 
+## 🖥️ User Interface
+
+AirShift includes a **Streamlit-based web interface** that provides a simple way to interact with the trained model through the FastAPI service.
+
+The interface allows users to:
+
+* Select a monitoring station
+* Load demo observations
+* Upload recent air quality data
+* Review recent PM2.5 conditions
+* Request an early-warning prediction
+* View deterioration probability
+* View the configured warning threshold
+* View the final early-warning decision
+
+The application communicates with the FastAPI prediction service rather than directly loading or modifying the machine learning model.
+
+### Running the Interface
+
+Start the FastAPI service first:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Then, in a separate terminal, start the Streamlit interface:
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+The application will open in the browser and communicate with the local FastAPI service through the `/predict` endpoint.
+
+### Application Architecture
+
+```text
+User
+  ↓
+Streamlit Interface
+  ↓
+FastAPI
+  ↓
+Feature Engineering
+  ↓
+XGBoost Model
+  ↓
+Prediction
+  ↓
+Streamlit Results
+```
+
+The interface is designed as a demonstration and local inference layer for the AirShift machine learning system.
+
+---
+
 ## 📚 Documentation
 
 Detailed project documentation is available in the `docs/` directory:
@@ -228,6 +283,8 @@ Detailed project documentation is available in the `docs/` directory:
 ```text
 airshift/
 ├── api/
+├── app/ 
+│   └── streamlit_app.py
 ├── data/
 │   ├── raw/
 │   └── processed/
@@ -270,6 +327,7 @@ airshift/
 * [x] Early warning evaluation
 * [x] Lead-time analysis
 * [x] FastAPI deployment and validation
+* [x] Streamlit user interface
 
 **AirShift is a completed end-to-end machine learning prototype for research and portfolio purposes.**
 
